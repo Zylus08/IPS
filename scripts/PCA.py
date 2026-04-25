@@ -27,7 +27,7 @@ mpl.rcParams.update({
 # ==========================
 # LOAD DATA (ONCE)
 # ==========================
-csv_path = "time_series_features_all_39_datasets.csv"
+csv_path = "time_series_features_all_38_datasets.csv"
 df = pd.read_csv(csv_path, index_col=0)
 print(f"Loaded {df.shape[0]} datasets with {df.shape[1]} features.")
 print(f"Missing values before imputation:\n{df.isnull().sum()}")
