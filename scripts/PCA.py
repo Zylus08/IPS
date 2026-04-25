@@ -27,7 +27,7 @@ mpl.rcParams.update({
 # ==========================
 # LOAD DATA (ONCE)
 # ==========================
-csv_path = "time_series_features_all_55_datasets.csv"
+csv_path = "time_series_features_all_39_datasets.csv"
 df = pd.read_csv(csv_path, index_col=0)
 print(f"Loaded {df.shape[0]} datasets with {df.shape[1]} features.")
 print(f"Missing values before imputation:\n{df.isnull().sum()}")
@@ -76,7 +76,7 @@ print(f"\nSilhouette suggests K={best_k_sil}")
 # ==========================
 # MANUAL K SELECTION
 # ==========================
-k = 4   # change as needed
+k = 3   # change as needed
 print(f"\nUsing manually selected K = {k} for final clustering.")
 
 # ==========================
