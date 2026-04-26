@@ -5,8 +5,7 @@ import matplotlib as mpl
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import silhouette_score
+from sklearn.preprocessing import RobustScaler
 from sklearn.impute import KNNImputer
 
 # ==========================
@@ -25,83 +24,173 @@ mpl.rcParams.update({
 })
 
 # ==========================
-# LOAD DATA (ONCE)
+# LOAD DATA
 # ==========================
-csv_path = "time_series_features_all_38_datasets.csv"
+csv_path = "time_series_features_all_48_datasets.csv"
 df = pd.read_csv(csv_path, index_col=0)
-print(f"Loaded {df.shape[0]} datasets with {df.shape[1]} features.")
-print(f"Missing values before imputation:\n{df.isnull().sum()}")
+
+print(f"Original datasets: {len(df)}")
+
+# ---------------------------------------
+# REMOVE CLASSIFICATION DATASETS (.ts)
+# ---------------------------------------
+df = df[~df.index.str.endswith(".ts")]
+
+print(f"Forecasting datasets retained: {len(df)}")
+
+print("\nMissing values before imputation:")
+print(df.isnull().sum())
 
 # ==========================
 # KNN IMPUTATION
 # ==========================
-imputer = KNNImputer(n_neighbors=5, weights='distance')
+imputer = KNNImputer(
+    n_neighbors=5,
+    weights='distance'
+)
+
 df_imputed_array = imputer.fit_transform(df)
-df_imputed = pd.DataFrame(df_imputed_array, index=df.index, columns=df.columns)
-print(f"\nMissing values after imputation: {df_imputed.isnull().sum().sum()} (should be 0)")
+
+df_imputed = pd.DataFrame(
+    df_imputed_array,
+    index=df.index,
+    columns=df.columns
+)
+
+print(f"\nMissing values after imputation: {df_imputed.isnull().sum().sum()}")
 
 # ==========================
-# SCALE FEATURES
+# LOG TRANSFORM ONLY HEAVY FEATURES
 # ==========================
-scaler = StandardScaler()
+heavy_cols = ["Variance", "Energy"]
+
+for col in heavy_cols:
+    if col in df_imputed.columns:
+        df_imputed[col] = np.log1p(df_imputed[col])
+
+print("\nApplied log transform on Variance + Energy")
+
+# ==========================
+# DROP WEAK FEATURES
+# ==========================
+# ==========================
+# DROP WEAK / LOW INFORMATION FEATURES
+# ==========================
+drop_cols = [
+    "Mean",
+    "Energy",
+    "Peak-to-Peak",
+    "Stationarity (ADF Test)",
+    "Trend Strength",
+    "Seasonality Strength"
+]
+
+existing_drop_cols = [
+    col for col in drop_cols
+    if col in df_imputed.columns
+]
+
+df_imputed = df_imputed.drop(
+    columns=existing_drop_cols
+)
+
+print("\nDropped weak / low-information features:")
+print(existing_drop_cols)
+
+print("\nRemaining clustering features:")
+print(df_imputed.columns.tolist())
+
+# ==========================
+# ROBUST SCALING
+# ==========================
+scaler = RobustScaler()
 scaled_features = scaler.fit_transform(df_imputed)
 
-# ==========================
-# PCA REDUCTION (2 components)
-# ==========================
-pca = PCA(n_components=2)
-principal_components = pca.fit_transform(scaled_features)
-print(f"PCA explained variance ratio: {pca.explained_variance_ratio_}")
+print("\nRobust scaling complete.")
 
 # ==========================
-# SILHOUETTE & ELBOW (reference)
+# FIXED K SELECTION
 # ==========================
-k_values = range(2, 11)
-inertia_values = []
-silhouette_scores = []
+k = 4   # change to 4 if needed
 
-for k in k_values:
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-    labels = kmeans.fit_predict(principal_components)
-    inertia_values.append(kmeans.inertia_)
-    sil = silhouette_score(principal_components, labels)
-    silhouette_scores.append(sil)
-
-print("\n===== OPTIMAL K DETERMINATION (reference) =====")
-for k, inertia, sil in zip(k_values, inertia_values, silhouette_scores):
-    print(f"K={k}: Inertia={inertia:.2f}, Silhouette={sil:.3f}")
-best_k_sil = k_values[np.argmax(silhouette_scores)]
-print(f"\nSilhouette suggests K={best_k_sil}")
-
-# ==========================
-# MANUAL K SELECTION
-# ==========================
-k = 3   # change as needed
-print(f"\nUsing manually selected K = {k} for final clustering.")
+print(f"\nUsing fixed K = {k}")
 
 # ==========================
 # FINAL CLUSTERING
+# IMPORTANT: FULL FEATURE SPACE
 # ==========================
-kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-labels = kmeans.fit_predict(principal_components)
+kmeans = KMeans(
+    n_clusters=k,
+    random_state=42,
+    n_init=100
+)
 
-# Add Cluster column to the imputed DataFrame (index already has dataset names)
+labels = kmeans.fit_predict(scaled_features)
+
 df_imputed["Cluster"] = labels
 
 # ==========================
-# 2D PLOT (decision boundary)
+# PRINT DATASETS PER CLUSTER
 # ==========================
+print("\n===== DATASETS PER CLUSTER =====")
+
+for cluster in sorted(df_imputed["Cluster"].unique()):
+    print(f"\nCluster {cluster}:")
+    
+    cluster_datasets = df_imputed[
+        df_imputed["Cluster"] == cluster
+    ].index.tolist()
+    
+    for ds in cluster_datasets:
+        print(f" - {ds}")
+
+# ==========================
+# PCA ONLY FOR VISUALIZATION
+# ==========================
+pca = PCA(n_components=2)
+principal_components = pca.fit_transform(scaled_features)
+
+print("\nPCA explained variance ratio:")
+print(pca.explained_variance_ratio_)
+
+# ==========================
+# VISUALIZATION
+# ==========================
+plt.figure(figsize=(18, 11))
+
+# Create mesh grid first
 x_min, x_max = principal_components[:, 0].min() - 1, principal_components[:, 0].max() + 1
 y_min, y_max = principal_components[:, 1].min() - 1, principal_components[:, 1].max() + 1
-xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.01),
-                     np.arange(y_min, y_max, 0.01))
 
-z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
+xx, yy = np.meshgrid(
+    np.arange(x_min, x_max, 0.01),
+    np.arange(y_min, y_max, 0.01)
+)
+
+# Convert PCA grid points back to original feature space
+grid_points_pca = np.c_[xx.ravel(), yy.ravel()]
+
+grid_points_original = pca.inverse_transform(
+    grid_points_pca
+)
+
+# Use ORIGINAL KMeans model
+z = kmeans.predict(
+    grid_points_original
+)
+
 z = z.reshape(xx.shape)
 
-plt.figure(figsize=(18, 11))
-plt.contourf(xx, yy, z, alpha=0.25, cmap="Set1")
+# Plot decision boundaries
+plt.contourf(
+    xx,
+    yy,
+    z,
+    alpha=0.25,
+    cmap="Set1"
+)
 
+# Scatter actual points
 scatter = plt.scatter(
     principal_components[:, 0],
     principal_components[:, 1],
@@ -112,33 +201,78 @@ scatter = plt.scatter(
     linewidth=1.8
 )
 
-# Annotate with dataset names from the index
+# Annotate names
 for i, dataset in enumerate(df_imputed.index):
-    plt.annotate(dataset,
-                 (principal_components[i, 0],
-                  principal_components[i, 1]),
-                 fontsize=16,
-                 fontweight='bold')
+    plt.annotate(
+        dataset,
+        (
+            principal_components[i, 0],
+            principal_components[i, 1]
+        ),
+        fontsize=8
+    )
 
 plt.xlabel("PCA Component 1")
 plt.ylabel("PCA Component 2")
-plt.title(f"K-Means Clustering (K={k}) on Time Series Features (KNN imputed)")
-cbar = plt.colorbar(scatter)
-cbar.ax.tick_params(labelsize=18)
-cbar.set_label("Cluster", fontsize=20, fontweight='bold')
-plt.tight_layout()
-plt.savefig(f"clustering_results_k{k}_knn_imputed.pdf", dpi=300)
-plt.show()
+plt.title(f"K-Means Clustering (K={k}) on Forecasting Datasets")
 
+cbar = plt.colorbar(scatter)
+cbar.set_label("Cluster")
+
+plt.tight_layout()
+plt.savefig(
+    f"final_clustering_k{k}.pdf",
+    dpi=300
+)
+
+plt.show()
 # ==========================
-# DISPLAY IMPUTED DATAFRAME WITH CLUSTERS
+# FINAL OUTPUT
 # ==========================
-print("\n===== IMPUTED DATAFRAME WITH CLUSTERS =====")
-# To match the original display style, use to_string() – no extra "Dataset" column
+print("\n===== FINAL CLUSTER SIZES =====")
+print(df_imputed["Cluster"].value_counts().sort_index())
+
+print("\n===== FINAL DATAFRAME =====")
 print(df_imputed.to_string())
 
-# Save to CSV (index will be the dataset names, no extra index column)
-df_imputed.to_csv("imputed_clustered_data.csv")
+df_imputed.to_csv(
+    "final_clustered_forecasting_datasets.csv"
+)
 
-print("\nCluster sizes:")
-print(df_imputed["Cluster"].value_counts().sort_index())
+# =====================================
+# FIND FARTHEST POINTS FROM CLUSTER 0
+# =====================================
+from scipy.spatial.distance import cdist
+
+target_cluster = 0   # jis cluster mein 15 datasets hain
+
+# indices of datasets in cluster 0
+cluster_indices = np.where(labels == target_cluster)[0]
+
+# feature vectors of that cluster
+cluster_points = scaled_features[cluster_indices]
+
+# centroid
+centroid = kmeans.cluster_centers_[target_cluster].reshape(1, -1)
+
+# distances from centroid
+distances = cdist(cluster_points, centroid).flatten()
+
+# dataset names
+dataset_names = df_imputed.index[cluster_indices]
+
+distance_df = pd.DataFrame({
+    "Dataset": dataset_names,
+    "Distance_From_Centroid": distances
+})
+
+distance_df = distance_df.sort_values(
+    by="Distance_From_Centroid",
+    ascending=False
+)
+
+print("\n===== FARTHEST DATASETS FROM CLUSTER CENTROID =====")
+print(distance_df)
+
+print("\nTop 5 candidates to remove:")
+print(distance_df.head(5))

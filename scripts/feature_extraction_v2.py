@@ -211,8 +211,8 @@ print("FINAL FEATURES TABLE (INCLUDING SHORT SERIES)")
 print("="*80)
 print(features_df.to_string())
 
-features_df.to_csv("time_series_features_all_46_datasets.csv")
-print("\nTable saved as 'time_series_features_all_46_datasets.csv'")
+features_df.to_csv("time_series_features_all_48_datasets.csv")
+print("\nTable saved as 'time_series_features_all_48_datasets.csv'")
 
 if errors:
     print("\n" + "="*80)
