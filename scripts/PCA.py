@@ -244,35 +244,39 @@ df_imputed.to_csv(
 # =====================================
 from scipy.spatial.distance import cdist
 
-target_cluster = 0   # jis cluster mein 15 datasets hain
+print("\n===== CLOSEST DATASET TO CENTROID (PER CLUSTER) =====")
 
-# indices of datasets in cluster 0
-cluster_indices = np.where(labels == target_cluster)[0]
+for cluster_id in np.unique(labels):
+    
+    # indices of datasets in this cluster
+    cluster_indices = np.where(labels == cluster_id)[0]
 
-# feature vectors of that cluster
-cluster_points = scaled_features[cluster_indices]
+    # feature vectors of that cluster
+    cluster_points = scaled_features[cluster_indices]
 
-# centroid
-centroid = kmeans.cluster_centers_[target_cluster].reshape(1, -1)
+    # centroid of this cluster
+    centroid = kmeans.cluster_centers_[cluster_id].reshape(1, -1)
 
-# distances from centroid
-distances = cdist(cluster_points, centroid).flatten()
+    # distances from centroid
+    distances = cdist(cluster_points, centroid).flatten()
 
-# dataset names
-dataset_names = df_imputed.index[cluster_indices]
+    # dataset names
+    dataset_names = df_imputed.index[cluster_indices]
 
-distance_df = pd.DataFrame({
-    "Dataset": dataset_names,
-    "Distance_From_Centroid": distances
-})
+    distance_df = pd.DataFrame({
+        "Dataset": dataset_names,
+        "Distance_From_Centroid": distances
+    })
 
-distance_df = distance_df.sort_values(
-    by="Distance_From_Centroid",
-    ascending=False
-)
+    # sort ascending → closest first
+    distance_df = distance_df.sort_values(
+        by="Distance_From_Centroid",
+        ascending=True
+    )
 
-print("\n===== FARTHEST DATASETS FROM CLUSTER CENTROID =====")
-print(distance_df)
+    print(f"\nCluster {cluster_id}:")
+    print("Closest dataset:")
+    print(distance_df.head(1))
 
-print("\nTop 5 candidates to remove:")
-print(distance_df.head(5))
+# print("\nTop 5 candidates to remove:")
+# print(distance_df.head(5))
