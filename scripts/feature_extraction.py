@@ -4,8 +4,14 @@ import numpy as np
 import pandas as pd
 import warnings
 from scipy.stats import skew, kurtosis, entropy
-from statsmodels.tsa.stattools import adfuller, acf
-from statsmodels.tsa.seasonal import seasonal_decompose
+
+try:
+    from statsmodels.tsa.stattools import adfuller, acf
+    from statsmodels.tsa.seasonal import seasonal_decompose
+except ImportError:
+    adfuller = acf = seasonal_decompose = None
+    warnings.warn("statsmodels is required for time series feature extraction. Install it with 'pip install statsmodels'.")
+
 warnings.filterwarnings('ignore')
 
 # ------------------------------------------------------------
