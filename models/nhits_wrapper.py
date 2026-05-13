@@ -18,7 +18,7 @@ class NHITSModel:
                     input_size=config["window_size"],
                     learning_rate=config["lr"],
                     dropout_prob_theta=config["dropout"],
-                    max_steps=30
+                    max_steps=15
                 )
             ],
             freq='D'

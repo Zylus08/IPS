@@ -19,7 +19,7 @@ class TimesNetModel:
                     hidden_size=config["hidden_dim"],
                     dropout=config["dropout"],
                     learning_rate=config["lr"],
-                    max_steps=30
+                    max_steps=15
                 )
             ],
             freq='D'
