@@ -19,7 +19,7 @@ class PatchTSTModel:
                     n_heads=4,
                     dropout=config["dropout"],
                     learning_rate=config["lr"],
-                    max_steps=100
+                    max_steps=30
                 )
             ],
             freq='D'
@@ -48,30 +48,11 @@ class PatchTSTModel:
 
         forecasts = self.model.predict()
 
-        print("\nFORECAST DF:")
-        print(forecasts.head())
-
-        print("\nFORECAST SHAPE:")
-        print(forecasts.shape)
-
-        # prediction column name
+        # take ONLY prediction column
         pred_col = forecasts.columns[-1]
 
-        # extract prediction values
-        pred_values = forecasts[pred_col].values
+        pred_values = forecasts[pred_col].astype(float).to_numpy()
 
-        print("\nPRED VALUES SHAPE:")
-        print(pred_values.shape)
-
-        # ensure exact horizon length
         pred_values = pred_values[:self.horizon]
 
-        preds = np.tile(
-            pred_values,
-            (len(X), 1)
-        )
-
-        print("\nFINAL PREDS SHAPE:")
-        print(preds.shape)
-
-        return preds
+        return pred_values

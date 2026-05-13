@@ -19,7 +19,7 @@ class TimesNetModel:
                     hidden_size=config["hidden_dim"],
                     dropout=config["dropout"],
                     learning_rate=config["lr"],
-                    max_steps=100
+                    max_steps=30
                 )
             ],
             freq='D'
@@ -48,6 +48,11 @@ class TimesNetModel:
 
         forecasts = self.model.predict()
 
-        preds = forecasts.values[-1]
+        # take ONLY prediction column
+        pred_col = forecasts.columns[-1]
 
-        return np.tile(preds, (len(X), 1))
+        pred_values = forecasts[pred_col].astype(float).to_numpy()
+
+        pred_values = pred_values[:self.horizon]
+
+        return pred_values

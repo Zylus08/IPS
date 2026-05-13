@@ -18,7 +18,7 @@ class NHITSModel:
                     input_size=config["window_size"],
                     learning_rate=config["lr"],
                     dropout_prob_theta=config["dropout"],
-                    max_steps=100
+                    max_steps=30
                 )
             ],
             freq='D'
@@ -47,6 +47,13 @@ class NHITSModel:
 
         forecasts = self.model.predict()
 
-        preds = forecasts.values[-1]
+        # model prediction column
+        pred_col = forecasts.columns[-1]
 
-        return np.tile(preds, (len(X), 1))
+        # extract ONLY prediction values
+        pred_values = forecasts[pred_col].to_numpy()
+
+        # ensure horizon length
+        pred_values = pred_values[:self.horizon]
+
+        return pred_values

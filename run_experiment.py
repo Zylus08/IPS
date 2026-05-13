@@ -4,7 +4,7 @@ import pandas as pd
 from utils.config import BASE_CONFIG
 from utils.data_loader import train_val_test_split, create_windows
 from utils.metrics import mae, rmse, mape
-
+import time
 # import models
 from models.tsmixer import TSMixerModel
 from models.patchtst_wrapper import PatchTSTModel
@@ -13,11 +13,14 @@ from models.nhits_wrapper import NHITSModel
 # from models.prophet_wrapper import ProphetModel
 # from models.chronos_wrapper import ChronosModel
 # # add others here
+import torch
+
+torch.set_float32_matmul_precision('medium')
 
 MODELS = {
-    # "PatchTST": PatchTSTModel,
-    # "TimesNet": TimesNetModel,
-    "NHITS": NHITSModel,
+    "PatchTST": PatchTSTModel,
+    "TimesNet": TimesNetModel,
+    # "NHITS": NHITSModel,
     # "Prophet": ProphetModel,
     # "Chronos": ChronosModel
 }
@@ -28,6 +31,9 @@ DATASETS = {
     "m4_hourly_dataset": r"e:\IPS\dataset_marked\m4_hourly_dataset.tsf",
     "m3_yearly_dataset": r"e:\IPS\dataset_marked\m3_yearly_dataset.tsf",
 }
+
+np.random.seed(42)
+torch.manual_seed(42)
 
 def load_series(path):
     if path.endswith(".csv"):
@@ -97,15 +103,36 @@ def run_pipeline(mode="dataset_first"):
             for mname, ModelClass in MODELS.items():
                 model = ModelClass(config=BASE_CONFIG)
 
-                model.fit(X_train, y_train)
-                preds = model.predict(X_test)
+                try:
+                    start = time.time()
+
+                    model.fit(X_train, y_train)
+                    preds = model.predict(X_test)
+
+                    end = time.time()
+
+                except Exception as e:
+                    print(f"Error in {mname} on {dname}: {e}")
+                    continue
+
+                # compare only last forecast window
+                y_true_last = y_test[-1]
+
+                # flatten prediction correctly
+                if preds.ndim == 2:
+                    y_pred_last = preds[0]
+                else:
+                    y_pred_last = preds
 
                 results.append({
-                    "Dataset": dname,
-                    "Model": mname,
-                    "MAE": mae(y_test, preds),
-                    "RMSE": rmse(y_test, preds)
-                })
+                        "Param": "baseline",
+                        "Value": "default",
+                        "Dataset": dname,
+                        "Model": mname,
+                        "MAE": mae(y_true_last, y_pred_last),
+                        "RMSE": rmse(y_true_last, y_pred_last),
+                        "MAPE": mape(y_true_last, y_pred_last),
+                        "Train_Time": end - start})
 
     elif mode == "model_first":
         for mname, ModelClass in MODELS.items():
@@ -125,15 +152,45 @@ def run_pipeline(mode="dataset_first"):
 
                 model = ModelClass(config=BASE_CONFIG)
 
-                model.fit(X_train, y_train)
-                preds = model.predict(X_test)
+                try:
+                    start = time.time()
+
+                    model.fit(X_train, y_train)
+                    preds = model.predict(X_test)
+
+                    end = time.time()
+
+                except Exception as e:
+                    print(f"Error in {mname} on {dname}: {e}")
+                    continue
+
+                # compare only last forecast window
+                y_true_last = y_test[-1]
+
+                # flatten prediction correctly
+                if preds.ndim == 2:
+                    y_pred_last = preds[0]
+                else:
+                    y_pred_last = preds
+
+                if len(y_true_last) != len(y_pred_last):
+                    min_len = min(
+                        len(y_true_last),
+                        len(y_pred_last)
+                    )
+
+                    y_true_last = y_true_last[:min_len]
+                    y_pred_last = y_pred_last[:min_len]
 
                 results.append({
-                    "Dataset": dname,
-                    "Model": mname,
-                    "MAE": mae(y_test, preds),
-                    "RMSE": rmse(y_test, preds),
-                    "MAPE": mape(y_test, preds)
+                        "Param": "baseline",
+                        "Value": "default",
+                        "Dataset": dname,
+                        "Model": mname,
+                        "MAE": mae(y_true_last, y_pred_last),
+                        "RMSE": rmse(y_true_last, y_pred_last),
+                        "MAPE": mape(y_true_last, y_pred_last),
+                        "Train_Time": end - start
                 })
 
     results_df = pd.DataFrame(results)
@@ -180,16 +237,46 @@ def run_ablation(param_name, values, mode="dataset_first"):
                 for mname, ModelClass in MODELS.items():
                     model = ModelClass(config)
 
-                    model.fit(X_train, y_train)
-                    preds = model.predict(X_test)
+                    try:
+                        start = time.time()
+
+                        model.fit(X_train, y_train)
+                        preds = model.predict(X_test)
+
+                        end = time.time()
+
+                    except Exception as e:
+                        print(f"Error in {mname} on {dname}: {e}")
+                        continue
+
+                    # compare only last forecast window
+                    y_true_last = y_test[-1]
+
+                    # flatten prediction correctly
+                    if preds.ndim == 2:
+                        y_pred_last = preds[0]
+                    else:
+                        y_pred_last = preds
+
+                    if len(y_true_last) != len(y_pred_last):
+
+                        min_len = min(
+                            len(y_true_last),
+                            len(y_pred_last)
+                        )
+
+                        y_true_last = y_true_last[:min_len]
+                        y_pred_last = y_pred_last[:min_len]
 
                     results.append({
-                        "Param": param_name,
-                        "Value": val,
-                        "Dataset": dname,
-                        "Model": mname,
-                        "MAE": mae(y_test, preds),
-                        "RMSE": rmse(y_test, preds)
+                            "Param": param_name,
+                            "Value": val,
+                            "Dataset": dname,
+                            "Model": mname,
+                            "MAE": mae(y_true_last, y_pred_last),
+                            "RMSE": rmse(y_true_last, y_pred_last),
+                            "MAPE": mape(y_true_last, y_pred_last),
+                            "Train_Time": end - start
                     })
 
     return pd.DataFrame(results)
@@ -207,7 +294,18 @@ if __name__ == "__main__":
     df_all.append(run_ablation("dropout", [0.1, 0.3]))
 
     final_df = pd.concat(df_all, ignore_index=True)
+    final_df = final_df.sort_values(by=["Param", "Dataset", "Model"])
 
     final_df.to_csv("ablation_results.csv", index=False)
 
     print(final_df)
+    best_df = final_df.loc[
+        final_df.groupby(
+            ["Param", "Dataset", "Model"]
+        )["RMSE"].idxmin()
+    ]
+
+    best_df.to_csv(
+    "best_results.csv",
+    index=False
+    )
