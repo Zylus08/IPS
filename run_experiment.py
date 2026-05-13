@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from utils.config import BASE_CONFIG
 from utils.data_loader import train_val_test_split, create_windows
-from utils.metrics import mae, rmse, mape
+from utils.metrics import mae, rmse, mape, smape
 import time
 # import models
 from models.tsmixer import TSMixerModel
@@ -132,6 +132,7 @@ def run_pipeline(mode="dataset_first"):
                         "MAE": mae(y_true_last, y_pred_last),
                         "RMSE": rmse(y_true_last, y_pred_last),
                         "MAPE": mape(y_true_last, y_pred_last),
+                        "SMAPE": smape(y_true_last, y_pred_last),
                         "Train_Time": end - start})
 
     elif mode == "model_first":
@@ -190,6 +191,7 @@ def run_pipeline(mode="dataset_first"):
                         "MAE": mae(y_true_last, y_pred_last),
                         "RMSE": rmse(y_true_last, y_pred_last),
                         "MAPE": mape(y_true_last, y_pred_last),
+                        "SMAPE": smape(y_true_last, y_pred_last),
                         "Train_Time": end - start
                 })
 
@@ -276,6 +278,7 @@ def run_ablation(param_name, values, mode="dataset_first"):
                             "MAE": mae(y_true_last, y_pred_last),
                             "RMSE": rmse(y_true_last, y_pred_last),
                             "MAPE": mape(y_true_last, y_pred_last),
+                            "SMAPE": smape(y_true_last, y_pred_last),
                             "Train_Time": end - start
                     })
 
